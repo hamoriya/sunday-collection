@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スマホカード | きらっと記念発行</title>
+<script src="qrcode.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+    background: #10182b;
+    color: #f2f5fb;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 18px 14px 40px;
+  }
+  h1 { font-size: 15px; color: #9fb0d0; font-weight: 600; margin-bottom: 12px; }
+  .no { font-size: 34px; font-weight: 800; color: #f5a623; font-variant-numeric: tabular-nums; }
+  .progress { font-size: 13px; color: #b8c6e2; margin: 2px 0 14px; }
+  .qr-wrap {
+    background: #fff;
+    padding: 18px;
+    border-radius: 16px;
+    line-height: 0;
+  }
+  .qr-wrap img { width: min(68vw, 300px); height: auto; image-rendering: pixelated; }
+  .caption { font-size: 12px; color: #aebbd8; margin: 14px 0 20px; text-align: center; line-height: 1.7; }
+  .buttons { display: flex; flex-direction: column; gap: 10px; width: min(88vw, 360px); }
+  button {
+    padding: 16px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .next { background: linear-gradient(180deg, #ffd479, #f5a623); color: #1d2333; }
+  .back { background: rgba(255,255,255,.1); color: #d6deef; border: 1px solid rgba(255,255,255,.22); font-size: 13px; padding: 10px; }
+  .done { margin-top: 40px; font-size: 16px; color: #9fe6a0; text-align: center; line-height: 2; }
+  details {
+    margin-top: 26px;
+    width: min(88vw, 360px);
+    font-size: 12px;
+    color: #8c9bbd;
+  }
+  details summary { cursor: pointer; padding: 6px 0; }
+  details input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.25);
+    background: rgba(255,255,255,.06);
+    color: #f2f5fb;
+    font-size: 12px;
+    margin: 8px 0;
+  }
+  details button { width: 100%; font-size: 13px; padding: 10px; background: rgba(255,255,255,.12); color: #f2f5fb; }
+  .danger { margin-top: 10px; }
+  .danger button { background: rgba(255,120,120,.15); color: #ffb3b3; }
+</style>
+</head>
+<body>
+  <h1>きらっと記念発行 — スマホカード</h1>
+  <div id="app"></div>
+
+  <script>
+  (async function () {
+    const LS_POS = "kiratto_card_pos";
+    const LS_BASE = "kiratto_card_base";
+    const app = document.getElementById("app");
+
+    let manifest = { prefix: "KIRATTO", count: 100 };
+    try {
+      const res = await fetch("manifest.json", { cache: "no-store" });
+      if (res.ok) manifest = Object.assign(manifest, await res.json());
+    } catch (e) { /* file:// では既定値 */ }
+    manifest.count = parseInt(manifest.count, 10) || 100;
+
+    function autoBase() {
+      if (location.protocol === "http:" || location.protocol === "https:") {
+        return location.href.replace(/[^/]*$/, "");
+      }
+      return "";
+    }
+    function baseUrl() {
+      return localStorage.getItem(LS_BASE) || autoBase();
+    }
+    function pos() {
+      const v = parseInt(localStorage.getItem(LS_POS), 10);
+      return Number.isInteger(v) && v >= 1 ? v : 1;
+    }
+
+    function render() {
+      const n = pos();
+      const base = baseUrl();
+
+      if (n > manifest.count) {
+        app.innerHTML = '<div class="done">全 ' + manifest.count + ' 枚を配布しました。<br>おつかれさまでした。</div>' + settingsHtml();
+        bindSettings();
+        return;
+      }
+      if (!base) {
+        app.innerHTML = '<div class="caption">配布ページのURLが未設定です。<br>下の設定から入力してください。</div>' + settingsHtml();
+        bindSettings();
+        return;
+      }
+
+      const num = String(n).padStart(4, "0");
+      const url = base + "?n=" + n;
+      const qr = qrcode(0, "M");
+      qr.addData(url);
+      qr.make();
+
+      app.innerHTML = `
+        <div style="text-align:center">
+          <div class="no">No. ${num}</div>
+          <div class="progress">${n} / ${manifest.count}</div>
+        </div>
+        <div class="qr-wrap">${qr.createImgTag(6, 0)}</div>
+        <div class="caption">お客さんにこのQRを読み取ってもらう。<br>ページが開けたのを確認してから「渡した」を押す。</div>
+        <div class="buttons">
+          <button class="next" id="next">渡した → 次の番号へ</button>
+          <button class="back" id="back">1つ戻る（誤タップ時）</button>
+        </div>
+        ${settingsHtml()}`;
+
+      document.getElementById("next").addEventListener("click", () => {
+        localStorage.setItem(LS_POS, String(n + 1));
+        render();
+      });
+      document.getElementById("back").addEventListener("click", () => {
+        localStorage.setItem(LS_POS, String(Math.max(1, n - 1)));
+        render();
+      });
+      bindSettings();
+    }
+
+    function settingsHtml() {
+      return `
+        <details>
+          <summary>設定（URL・番号の手動変更）</summary>
+          <label>配布ページのURL（空欄なら自動）</label>
+          <input id="base-in" type="url">
+          <label>現在の番号</label>
+          <input id="pos-in" type="number" min="1">
+          <button id="save">保存</button>
+          <div class="danger"><button id="reset">最初（0001）に戻す</button></div>
+        </details>`;
+    }
+
+    function bindSettings() {
+      // 動的値はHTML文字列に埋め込まず、DOM API経由で設定する（属性エスケープ問題の回避）
+      const baseIn = document.getElementById("base-in");
+      const posIn = document.getElementById("pos-in");
+      if (baseIn) {
+        baseIn.value = localStorage.getItem(LS_BASE) || "";
+        baseIn.placeholder = autoBase() || "https://example.com/";
+      }
+      if (posIn) posIn.value = pos();
+      const save = document.getElementById("save");
+      const reset = document.getElementById("reset");
+      if (save) save.addEventListener("click", () => {
+        const b = document.getElementById("base-in").value.trim();
+        if (b) localStorage.setItem(LS_BASE, b.endsWith("/") || b.includes("?") ? b : b + "/");
+        else localStorage.removeItem(LS_BASE);
+        const p = parseInt(document.getElementById("pos-in").value, 10);
+        if (Number.isInteger(p) && p >= 1) localStorage.setItem(LS_POS, String(p));
+        render();
+      });
+      if (reset) reset.addEventListener("click", () => {
+        if (confirm("配布位置を 0001 に戻します。よろしいですか？")) {
+          localStorage.setItem(LS_POS, "1");
+          render();
+        }
+      });
+    }
+
+    render();
+  })();
+  </script>
+</body>
+</html>
