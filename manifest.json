@@ -3,5 +3,19 @@
   "count": 100,
   "issuer": "MiraQue",
   "title": "きらっと 記念発行版",
-  "issued_at": "2026-07-02"
+  "issued_at": "2026-07-02",
+  "series": {
+    "kiratto": {
+      "prefix": "KIRATTO",
+      "count": 100,
+      "title": "きらっと 記念発行版",
+      "issued_at": "2026-07-02"
+    },
+    "hoshimado": {
+      "prefix": "HOSHIMADO",
+      "count": 100,
+      "title": "星窓の看板 記念発行版",
+      "issued_at": "2026-07-03"
+    }
+  }
 }

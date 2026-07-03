@@ -66,13 +66,14 @@
 </head>
 <body>
   <div class="brand">MiraQue SUNDAY COLLECTION</div>
-  <h1>きらっと 記念発行版</h1>
+  <h1 id="page-title">きらっと 記念発行版</h1>
   <div id="app"></div>
   <script>
   (async function () {
     const app = document.getElementById("app");
     const params = new URLSearchParams(location.search);
     const raw = parseInt(params.get("n"), 10);
+    const sKey = params.get("s") || "kiratto";
 
     const esc = s => String(s).replace(/[&<>"']/g,
       c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -82,15 +83,28 @@
       const res = await fetch("manifest.json", { cache: "no-store" });
       if (res.ok) manifest = Object.assign(manifest, await res.json());
     } catch (e) { /* file:// 等では既定値で続行 */ }
-    manifest.count = parseInt(manifest.count, 10) || 100;
 
-    if (!Number.isInteger(raw) || raw < 1 || raw > manifest.count) {
+    // シリーズ解決: series マップ優先、kiratto は旧トップレベルにフォールバック
+    let series = (manifest.series && manifest.series[sKey]) || null;
+    if (!series && sKey === "kiratto") {
+      series = { prefix: manifest.prefix, count: manifest.count,
+                 title: manifest.title, issued_at: manifest.issued_at };
+    }
+    if (!series) {
+      app.innerHTML = '<div class="error">このシリーズは見つかりません。<br>配布スタッフのQRコードを読み取ってください。</div>';
+      return;
+    }
+    series.count = parseInt(series.count, 10) || 100;
+    document.getElementById("page-title").textContent = series.title || "記念発行版";
+    document.title = (series.title || "記念発行版") + " | MiraQue サンデーコレクション";
+
+    if (!Number.isInteger(raw) || raw < 1 || raw > series.count) {
       app.innerHTML = '<div class="error">この番号は見つかりません。<br>配布スタッフのQRコードを読み取ってください。</div>';
       return;
     }
 
     const num = String(raw).padStart(4, "0");
-    const serial = manifest.prefix + "-" + num;
+    const serial = series.prefix + "-" + num;
     const glb = "files/" + serial + ".glb";
     const usdz = "files/" + serial + ".usdz";
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -100,7 +114,7 @@
       <div class="serial-card">
         <div class="serial-label">COMMEMORATIVE No.</div>
         <div class="serial-no">${num}</div>
-        <div class="serial-edition">${raw} / ${manifest.count}</div>
+        <div class="serial-edition">${raw} / ${series.count}</div>
       </div>
       <model-viewer src="${glb}" ios-src="${usdz}"
         ar ar-modes="scene-viewer webxr quick-look"
@@ -116,7 +130,7 @@
       </div>
       <div class="note">
         この3Dデータは記念発行版です。番号 ${num} は配布運用上、この1枚だけお渡ししています。<br>
-        発行: ${esc(manifest.issuer || "MiraQue")}${manifest.issued_at ? " / " + esc(manifest.issued_at) : ""}
+        発行: ${esc(manifest.issuer || "MiraQue")}${series.issued_at ? " / " + esc(series.issued_at) : ""}
       </div>`;
 
     document.getElementById("ar-btn").addEventListener("click", function (e) {

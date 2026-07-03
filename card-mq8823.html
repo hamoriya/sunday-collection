@@ -64,21 +64,34 @@
 </style>
 </head>
 <body>
-  <h1>きらっと記念発行 — スマホカード</h1>
+  <h1 id="card-title">きらっと記念発行 — スマホカード</h1>
   <div id="app"></div>
 
   <script>
   (async function () {
-    const LS_POS = "kiratto_card_pos";
+    const sKey = new URLSearchParams(location.search).get("s") || "kiratto";
+    // kiratto は旧キーを継続使用（配布進行位置を壊さない）。他シリーズは別カウンター
+    const LS_POS = sKey === "kiratto" ? "kiratto_card_pos" : "card_pos_" + sKey;
     const LS_BASE = "kiratto_card_base";
     const app = document.getElementById("app");
 
-    let manifest = { prefix: "KIRATTO", count: 100 };
+    let manifest = { prefix: "KIRATTO", count: 100, title: "きらっと 記念発行版" };
     try {
       const res = await fetch("manifest.json", { cache: "no-store" });
       if (res.ok) manifest = Object.assign(manifest, await res.json());
     } catch (e) { /* file:// では既定値 */ }
-    manifest.count = parseInt(manifest.count, 10) || 100;
+
+    let series = (manifest.series && manifest.series[sKey]) || null;
+    if (!series && sKey === "kiratto") {
+      series = { prefix: manifest.prefix, count: manifest.count, title: manifest.title };
+    }
+    if (!series) {
+      app.innerHTML = '<div class="caption">シリーズ「' + sKey.replace(/[&<>"']/g, "") + '」が見つかりません。<br>URLの ?s= を確認してください。</div>';
+      return;
+    }
+    series.count = parseInt(series.count, 10) || 100;
+    document.getElementById("card-title").textContent = (series.title || "記念発行") + " — スマホカード";
+    document.title = "スマホカード | " + (series.title || "記念発行");
 
     function autoBase() {
       if (location.protocol === "http:" || location.protocol === "https:") {
@@ -98,8 +111,8 @@
       const n = pos();
       const base = baseUrl();
 
-      if (n > manifest.count) {
-        app.innerHTML = '<div class="done">全 ' + manifest.count + ' 枚を配布しました。<br>おつかれさまでした。</div>' + settingsHtml();
+      if (n > series.count) {
+        app.innerHTML = '<div class="done">全 ' + series.count + ' 枚を配布しました。<br>おつかれさまでした。</div>' + settingsHtml();
         bindSettings();
         return;
       }
@@ -110,7 +123,7 @@
       }
 
       const num = String(n).padStart(4, "0");
-      const url = base + "?n=" + n;
+      const url = base + (sKey === "kiratto" ? "?n=" + n : "?s=" + encodeURIComponent(sKey) + "&n=" + n);
       const qr = qrcode(0, "M");
       qr.addData(url);
       qr.make();
@@ -118,7 +131,7 @@
       app.innerHTML = `
         <div style="text-align:center">
           <div class="no">No. ${num}</div>
-          <div class="progress">${n} / ${manifest.count}</div>
+          <div class="progress">${n} / ${series.count}</div>
         </div>
         <div class="qr-wrap">${qr.createImgTag(6, 0)}</div>
         <div class="caption">お客さんにこのQRを読み取ってもらう。<br>ページが開けたのを確認してから「渡した」を押す。</div>
