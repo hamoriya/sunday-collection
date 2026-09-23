@@ -85,7 +85,10 @@
     } catch (e) { /* file:// 等では既定値で続行 */ }
 
     // シリーズ解決: series マップ優先、kiratto は旧トップレベルにフォールバック
-    let series = (manifest.series && manifest.series[sKey]) || null;
+    // URLの ?s= がそのままキーになるので、自前の項目だけを見る
+    // （hasOwnProperty を通さないと ?s=__proto__ で Object.prototype を拾ってしまう）
+    const table = (manifest.series && typeof manifest.series === "object") ? manifest.series : {};
+    let series = Object.prototype.hasOwnProperty.call(table, sKey) ? table[sKey] : null;
     if (!series && sKey === "kiratto") {
       series = { prefix: manifest.prefix, count: manifest.count,
                  title: manifest.title, issued_at: manifest.issued_at };
@@ -98,39 +101,51 @@
     document.getElementById("page-title").textContent = series.title || "記念発行版";
     document.title = (series.title || "記念発行版") + " | MiraQue サンデーコレクション";
 
-    if (!Number.isInteger(raw) || raw < 1 || raw > series.count) {
+    // 番号なしで開かれた場合、シリーズが base を持っていればそれを出す
+    // （番号を使い切った・スタッフ端末が使えない等の予備経路。番号は付かない）
+    // ファイル名になる値は prefix も base も同じ字種に限る（files/ の外を指させない）
+    const fileName = v => /^[A-Za-z0-9_-]+$/.test(v || "") ? v : null;
+    const hasNum = Number.isInteger(raw);
+    const baseName = fileName(series.base);
+    const prefixName = fileName(series.prefix);
+    const baseMode = !hasNum && !!baseName;
+
+    if (!baseMode && (!hasNum || raw < 1 || raw > series.count || !prefixName)) {
       app.innerHTML = '<div class="error">この番号は見つかりません。<br>配布スタッフのQRコードを読み取ってください。</div>';
       return;
     }
 
-    const num = String(raw).padStart(4, "0");
-    const serial = series.prefix + "-" + num;
-    const glb = "files/" + serial + ".glb";
-    const usdz = "files/" + serial + ".usdz";
+    const num = hasNum ? String(raw).padStart(4, "0") : "";
+    const stem = baseMode ? baseName : prefixName + "-" + num;
+    const glb = "files/" + stem + ".glb";
+    const usdz = "files/" + stem + ".usdz";
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
       || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-    app.innerHTML = `
+    const serialCard = baseMode ? "" : `
       <div class="serial-card">
         <div class="serial-label">COMMEMORATIVE No.</div>
         <div class="serial-no">${num}</div>
         <div class="serial-edition">${raw} / ${series.count}</div>
-      </div>
+      </div>`;
+    const issuer = `発行: ${esc(manifest.issuer || "MiraQue")}${series.issued_at ? " / " + esc(series.issued_at) : ""}`;
+
+    app.innerHTML = `
+      ${serialCard}
       <model-viewer src="${glb}" ios-src="${usdz}"
         ar ar-modes="scene-viewer webxr quick-look"
         camera-controls autoplay auto-rotate
-        alt="${serial}">
+        alt="${esc(series.title || "")}">
       </model-viewer>
       <div class="hint">指でぐるぐる回せます。<br>「ARで見る」で目の前の空間に置けます。</div>
       <div class="buttons">
         <a class="btn" id="ar-btn" href="#">AR で目の前に置く</a>
-        <a class="btn sub" href="${isIOS ? usdz : glb}" download="${serial}${isIOS ? ".usdz" : ".glb"}">
+        <a class="btn sub" href="${isIOS ? usdz : glb}" download="${stem}${isIOS ? ".usdz" : ".glb"}">
           データを持ち帰る（${isIOS ? "USDZ" : "GLB"}）
         </a>
       </div>
       <div class="note">
-        この3Dデータは記念発行版です。番号 ${num} は配布運用上、この1枚だけお渡ししています。<br>
-        発行: ${esc(manifest.issuer || "MiraQue")}${series.issued_at ? " / " + esc(series.issued_at) : ""}
+        ${baseMode ? "" : "記念の通し番号です。<br>"}${issuer}
       </div>`;
 
     document.getElementById("ar-btn").addEventListener("click", function (e) {
