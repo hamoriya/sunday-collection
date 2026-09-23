@@ -59,7 +59,8 @@
     background: linear-gradient(180deg, #ffd479, var(--accent));
     box-shadow: 0 4px 14px rgba(245,166,35,.35);
   }
-  .btn.sub { background: rgba(255,255,255,.12); color: #f2f5fb; box-shadow: none; border: 1px solid rgba(255,255,255,.25); }
+  .btn.sub { background: transparent; color: #ffd479; box-shadow: none; border: 2px solid var(--accent); }
+  .keep { font-size: 12px; color: #aebbd8; text-align: center; margin-top: 2px; line-height: 1.7; }
   .note { margin-top: 22px; font-size: 11px; color: #8c9bbd; text-align: center; line-height: 1.8; max-width: 420px; }
   .error { margin-top: 40px; font-size: 14px; color: #ffb3b3; text-align: center; line-height: 2; }
 </style>
@@ -139,11 +140,12 @@
       </model-viewer>
       <div class="hint">指でぐるぐる回せます。<br>「ARで見る」で目の前の空間に置けます。</div>
       <div class="buttons">
-        <a class="btn" id="ar-btn" href="#">AR で目の前に置く</a>
-        <a class="btn sub" href="${isIOS ? usdz : glb}" download="${stem}${isIOS ? ".usdz" : ".glb"}">
+        <a class="btn sub" id="ar-btn" href="#">AR で目の前に置く</a>
+        <a class="btn" href="${isIOS ? usdz : glb}" download="${stem}${isIOS ? ".usdz" : ".glb"}">
           データを持ち帰る（${isIOS ? "USDZ" : "GLB"}）
         </a>
       </div>
+      <div class="keep">持ち帰ると、あとからいつでも見られます。</div>
       <div class="note">
         ${baseMode ? "" : "記念の通し番号です。<br>"}${issuer}
       </div>`;
